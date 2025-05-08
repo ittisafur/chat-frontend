@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+  <head>
+    <title>WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        display: flex;
+        gap: 20px;
+      }
+      .panel {
+        flex: 1;
+        border: 1px solid #ccc;
+        padding: 15px;
+        border-radius: 5px;
+      }
+      input,
+      button {
+        margin: 5px 0;
+        padding: 8px;
+        width: 100%;
+      }
+      #messages {
+        height: 200px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        padding: 10px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WebSocket Test</h1>
+
+    <div class="container">
+      <div class="panel">
+        <h2>Connection</h2>
+        <input id="token" placeholder="JWT Token" />
+        <button id="connect">Connect</button>
+        <button id="disconnect">Disconnect</button>
+        <div id="status">Disconnected</div>
+      </div>
+
+      <div class="panel">
+        <h2>Direct Message</h2>
+        <input id="receiverId" placeholder="Receiver ID" />
+        <input id="directMessage" placeholder="Message content" />
+        <button id="sendDirect">Send Direct Message</button>
+      </div>
+
+      <div class="panel">
+        <h2>Group Operations</h2>
+        <input id="groupId" placeholder="Group ID" />
+        <button id="joinGroup">Join Group</button>
+        <button id="leaveGroup">Leave Group</button>
+        <input id="groupMessage" placeholder="Group message content" />
+        <button id="sendGroup">Send Group Message</button>
+      </div>
+    </div>
+
+    <h2>Messages</h2>
+    <div id="messages"></div>
+
+    <script>
+      let socket;
+
+      function addMessage(message) {
+        const messageDiv = document.getElementById("messages");
+        messageDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+        messageDiv.scrollTop = messageDiv.scrollHeight;
+      }
+
+      document.getElementById("connect").addEventListener("click", () => {
+        const token = document.getElementById("token").value;
+
+        if (!token) {
+          addMessage("Error: Please provide a token");
+          return;
+        }
+
+        socket = io("http://localhost:3000", {
+          auth: { token },
+        });
+
+        socket.on("connect", () => {
+          document.getElementById("status").textContent = "Connected";
+          addMessage("Connected to WebSocket server");
+        });
+
+        socket.on("connect_error", (error) => {
+          document.getElementById("status").textContent = "Connection Error";
+          addMessage(`Connection error: ${error.message}`);
+        });
+
+        socket.on("error", (error) => {
+          addMessage(`Error: ${error.message}`);
+        });
+
+        socket.on("direct-message", (message) => {
+          addMessage(`Direct message received: ${JSON.stringify(message)}`);
+        });
+
+        socket.on("message-sent", (message) => {
+          addMessage(`Message sent: ${JSON.stringify(message)}`);
+        });
+
+        socket.on("group-joined", (data) => {
+          addMessage(`Joined group: ${data.groupId}`);
+        });
+
+        socket.on("group-left", (data) => {
+          addMessage(`Left group: ${data.groupId}`);
+        });
+
+        socket.on("group-message", (message) => {
+          addMessage(`Group message received: ${JSON.stringify(message)}`);
+        });
+
+        socket.on("user-joined", (data) => {
+          addMessage(`User joined group: ${JSON.stringify(data)}`);
+        });
+
+        socket.on("user-left", (data) => {
+          addMessage(`User left group: ${JSON.stringify(data)}`);
+        });
+
+        socket.on("disconnect", () => {
+          document.getElementById("status").textContent = "Disconnected";
+          addMessage("Disconnected from WebSocket server");
+        });
+      });
+
+      document.getElementById("disconnect").addEventListener("click", () => {
+        if (socket) {
+          socket.disconnect();
+          document.getElementById("status").textContent = "Disconnected";
+        }
+      });
+
+      document.getElementById("sendDirect").addEventListener("click", () => {
+        if (!socket || !socket.connected) {
+          addMessage("Error: Not connected");
+          return;
+        }
+
+        const receiverId = document.getElementById("receiverId").value;
+        const content = document.getElementById("directMessage").value;
+
+        if (!receiverId || !content) {
+          addMessage("Error: Please provide receiver ID and message content");
+          return;
+        }
+
+        socket.emit("direct-message", { receiverId, content });
+        addMessage(`Direct message sent to ${receiverId}: ${content}`);
+      });
+
+      document.getElementById("joinGroup").addEventListener("click", () => {
+        if (!socket || !socket.connected) {
+          addMessage("Error: Not connected");
+          return;
+        }
+
+        const groupId = document.getElementById("groupId").value;
+
+        if (!groupId) {
+          addMessage("Error: Please provide group ID");
+          return;
+        }
+
+        socket.emit("join-group", { groupId });
+        addMessage(`Joining group: ${groupId}`);
+      });
+
+      document.getElementById("leaveGroup").addEventListener("click", () => {
+        if (!socket || !socket.connected) {
+          addMessage("Error: Not connected");
+          return;
+        }
+
+        const groupId = document.getElementById("groupId").value;
+
+        if (!groupId) {
+          addMessage("Error: Please provide group ID");
+          return;
+        }
+
+        socket.emit("leave-group", { groupId });
+        addMessage(`Leaving group: ${groupId}`);
+      });
+
+      document.getElementById("sendGroup").addEventListener("click", () => {
+        if (!socket || !socket.connected) {
+          addMessage("Error: Not connected");
+          return;
+        }
+
+        const groupId = document.getElementById("groupId").value;
+        const content = document.getElementById("groupMessage").value;
+
+        if (!groupId || !content) {
+          addMessage("Error: Please provide group ID and message content");
+          return;
+        }
+
+        socket.emit("group-message", { groupId, content });
+        addMessage(`Group message sent to ${groupId}: ${content}`);
+      });
+    </script>
+  </body>
+</html>
